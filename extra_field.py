@@ -1,12 +1,18 @@
 # Import dependencies
-import json
+import json, traceback
 import os
 import time
+from datetime import datetime
 
 import pandas as pd
 import requests
 from dotenv import load_dotenv
 
+logFile = "log-" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S")+".txt"
+def writeLog(text):
+        with open(logFile, 'a') as log:
+                log.write("{0},{1}\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"),str(text)))
+                
 # Loads variables in the .env file as environment variables
 load_dotenv()
 # Get github token from env vars
@@ -25,7 +31,12 @@ for field in extra_fields:
 header = {"Authorization": f"token {token}"}
 
 # Define a counter to count requests
-count = 0
+resetEpoch = 0
+remainingLimit = 0
+currentEpoch = 0
+#
+exceptionCount = 100
+
 
 for i in range(len(df)):
     # Split github_repo_url
@@ -36,37 +47,46 @@ for i in range(len(df)):
     # Merge url to send request github api
     url = protocol + '//' + 'api.' + domain + '/repos/' + user + '/' + repo + '/' + 'commits/' + commit_hash
     # Send request to api
-    r = requests.get(url, headers=header)
-    # Dump json
-    data = r.json()
-    ## GET FIELDS AND ADD THEM TO DATAFRAME ##
-    # Get date of the commit and add to dataframe
-    commit_date = data['commit']['author']['date']
-    df['commit_date'][i] = commit_date
+    try:
+        r = requests.get(url, headers=header)
+        recievedHeaders = dict(r.headers)
+        remainingLimit = int(recievedHeaders['X-RateLimit-Remaining'])
+        resetEpoch = int(recievedHeaders['X-RateLimit-Reset'])
+        # Dump json
+        data = r.json()
+        ## GET FIELDS AND ADD THEM TO DATAFRAME ##
+        # Get date of the commit and add to dataframe
+        commit_date = data['commit']['author']['date']
+        df['commit_date'][i] = commit_date
+        
+        # Get user's real name
+        user_name = data['commit']['author']['name']
+        df['user_name'][i] = user_name
+        
+        # Get commit message
+        commit_message = data['commit']['message']
+        df['commit_message'][i] = commit_message
+        
+        # Get user's avatar url
+        avatar_url = data['author']['avatar_url']
+        df['avatar_url'][i] = avatar_url
     
-    # Get user's real name
-    user_name = data['commit']['author']['name']
-    df['user_name'][i] = user_name
-    
-    # Get commit message
-    commit_message = data['commit']['message']
-    df['commit_message'][i] = commit_message
-    
-    # Get user's avatar url
-    avatar_url = data['author']['avatar_url']
-    df['avatar_url'][i] = avatar_url
-
-    # Get user's follower count at commit time
-    p = requests.get(data['author']['followers_url'])
-    follower_count = len(p.json())
-    df['follower_count'][i] = follower_count
-    
-    # Increment the counter
-    count += 1
-    # Only 5000 requests per hour is allowed. So wait for an hour when reached to 5000
-    if (count % 5000) == 0:
-        time.sleep(3600 + 5)
-
+        # Get user's follower count at commit time
+        p = requests.get(data['author']['followers_url'])
+        follower_count = len(p.json())
+        df['follower_count'][i] = follower_count
+        
+        if(remainingLimit == 0):
+            # sleep till you get the time limit but check every 5 mins
+            while (currentEpoch < resetEpoch):
+                time.sleep(300)
+                currentEpoch = int(time.time())
+    except:
+        writeLog("Exception happened! Current remainingLimit : {0}, resetEpoch : {1}, currentEpoch : {2}".format(remainingLimit, resetEpoch, currentEpoch))
+        writeLog(traceback.format_exc())
+        i -= 1
+        exceptionCount -= 1
+        if (exceptionCount < 0):
+            i = len(df)
 # Export data
 df.to_csv('python_extra.csv', index=False)
-        
