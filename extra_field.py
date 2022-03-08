@@ -10,8 +10,9 @@ from dotenv import load_dotenv
 
 logFile = "log-" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S")+".txt"
 def writeLog(text):
-        with open(logFile, 'a') as log:
-                log.write("{0},{1}\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"),str(text)))
+    with open(logFile, 'a') as log:
+        log.write("{0},{1}\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"),str(text)))
+    print('log file updated')
                 
 # Loads variables in the .env file as environment variables
 load_dotenv()
@@ -72,7 +73,7 @@ for i in range(len(df)):
         data = hashDataDict[commit_hash]
         writeToDataframe(data, i)
     else:
-        writeLog(commit_hash, 'not exists in dictionary, going to request')
+        writeLog(commit_hash+' not exists in dictionary, going to request')
         writeLog(hashDataDict)
         # Merge url to send request github api
         url = protocol + '//' + 'api.' + domain + '/repos/' + user + '/' + repo + '/' + 'commits/' + commit_hash
@@ -84,6 +85,7 @@ for i in range(len(df)):
             resetEpoch = int(recievedHeaders['X-RateLimit-Reset'])
             # Dump json
             data = r.json()
+            hashDataDict[commit_hash]=data
             writeToDataframe(data, i)
         except:
             writeLog("Exception happened! Current remainingLimit : {0}, resetEpoch : {1}, currentEpoch : {2}".format(remainingLimit, resetEpoch, currentEpoch))
