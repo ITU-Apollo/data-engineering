@@ -71,7 +71,9 @@ for i in range(len(df)):
     if (commit_hash in hashDataDict):
         data = hashDataDict[commit_hash]
         writeToDataframe(data, i)
-    else:        
+    else:
+        writeLog(commit_hash, 'not exists in dictionary, going to request')
+        writeLog(hashDataDict)
         # Merge url to send request github api
         url = protocol + '//' + 'api.' + domain + '/repos/' + user + '/' + repo + '/' + 'commits/' + commit_hash
         # Send request to api
