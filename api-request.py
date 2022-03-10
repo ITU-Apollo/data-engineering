@@ -19,3 +19,5 @@ for i in range(len(df)):
     url = 'http://3.122.101.195:9661/api/apollo/create'
     
     requests.post(url, data=dicty)
+    
+    print("sended :#", i)
